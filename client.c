@@ -48,6 +48,7 @@ void *chat(int sockfd, struct addrinfo *p)
 	FD_ZERO(&readfds);
 	FD_SET(0, &readfds);
 	FD_SET(sockfd, &readfds);
+
 	if(select(sockfd+1, &readfds, NULL, NULL, NULL) == -1)
 		errExit("select");
 

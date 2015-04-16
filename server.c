@@ -1,5 +1,6 @@
 #include"myhdr.h"
 
+/* represent each client */
 struct client{
 	char ip[INET6_ADDRSTRLEN];
 	struct sockaddr src_addr;
@@ -7,21 +8,22 @@ struct client{
 	struct client *next;
 };
 
-struct client *newNode(struct sockaddr *src_addr, int src_addrlen, char *ip);
-void sendAll(char *msg, struct client **headRef, int sockfd, struct sockaddr *src_addr, int src_addrlen, char *ip);
+struct client *newNode(struct sockaddr *, int, char *);
+void sendAll(char *, struct client **, int, struct sockaddr *, int, char *, int);
 
 int main()
 {
+	int closed;
 	int sockfd;
 	int numBytes;
+	char msg[MSGLEN];
 	char buf[MAXLEN];
 	socklen_t src_addrlen;
 	struct addrinfo hints;
 	struct addrinfo *res, *p;
 	struct sockaddr src_addr;
-	char dst_addr[INET6_ADDRSTRLEN];
-	char msg[MSGLEN];
 	struct client *clientList;
+	char dst_addr[INET6_ADDRSTRLEN];
 
 	initialise(&hints);
 
@@ -45,6 +47,7 @@ int main()
 		exit(1);
 	}
 
+	/* server address */
 	if(inet_ntop(p->ai_family, &src_addr, dst_addr, sizeof dst_addr) == NULL)
 		errExit("inet_ntop");
 	printf("\tserver@%s\n\n", dst_addr);
@@ -54,6 +57,7 @@ int main()
 	clientList = NULL;
 	src_addrlen = sizeof(struct sockaddr);
 	while("TRUE"){
+		closed = 0;
 		numBytes = recvfrom(sockfd, buf, sizeof buf - 1, 0, &src_addr, &src_addrlen);
 		if(numBytes == -1)
 			errExit("recvfrom");
@@ -61,15 +65,17 @@ int main()
 		if(inet_ntop(src_addr.sa_family, &src_addr, dst_addr, sizeof dst_addr) == NULL)
 			errExit("inet_ntop");
 
-		if(numBytes == 0)
+		if(numBytes == 0){
+			closed = 1;
 			snprintf(msg, sizeof msg, "%s closed connection!!!", dst_addr);
+		}
 		else{
 			buf[numBytes] = '\0';
 			snprintf(msg, sizeof msg, "%s>> %s", dst_addr, buf);
 		}
 		printf("%s\n", msg);
 
-		sendAll(msg, &clientList, sockfd, &src_addr, src_addrlen, dst_addr);
+		sendAll(msg, &clientList, sockfd, &src_addr, src_addrlen, dst_addr, closed);
 
 		src_addrlen = sizeof(struct sockaddr);
 	}
@@ -79,27 +85,46 @@ int main()
 }
 
 
-void sendAll(char *msg, struct client **headRef, int sockfd, struct sockaddr *src_addr, int src_addrlen, char *ip)
+void sendAll(char *msg, struct client **headRef, int sockfd, struct sockaddr *src_addr, int src_addrlen, char *ip, int closed)
 {
 	int found = 0;
-	struct client *new, *current;
+	struct client *new;
+	struct client *prev, *current;
+	struct client *prevNode, *currNode;
 
+	prev = NULL;
 	current = *headRef;
 	while(current != NULL){
-		if(strcmp(current->ip, ip) == 0)
+		if(strcmp(current->ip, ip) == 0){
 			found = 1;
-		else{
-			if(sendto(sockfd, msg, strlen(msg), 0, &(current->src_addr), current->src_addrlen) == -1)
-				errExit("sendto");
+			if(closed){
+				prevNode = prev;
+				currNode = current;
+			}
 		}
+		else
+			if(sendto(sockfd, msg, strlen(msg), 0, &current->src_addr, current->src_addrlen) == -1)
+				errExit("sendto");
 
+		prev = current;
 		current = current->next;
 	}
 
+	/* if new client, add to the client list */
 	if(!found){
 		new = newNode(src_addr, src_addrlen, ip);
 		new->next = *headRef;
 		*headRef = new;
+	}
+
+	/* if client closed, remove it form client list */
+	if(closed){
+		if(prevNode == NULL)
+			*headRef = currNode->next;
+		else
+			prevNode->next = currNode->next;
+
+		free(currNode);
 	}
 }
 
@@ -108,7 +133,7 @@ struct client *newNode(struct sockaddr *src_addr, int src_addrlen, char *ip)
 	struct client *new = malloc(sizeof(struct client));
 
 	strcpy(new->ip, ip);
-	memmove(&(new->src_addr), src_addr, sizeof(struct sockaddr));
+	memmove(&new->src_addr, src_addr, sizeof(struct sockaddr));
 	new->src_addrlen = src_addrlen;
 	new->next = NULL;
 
