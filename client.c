@@ -54,7 +54,7 @@ void *chat(int sockfd, struct addrinfo *p)
 
 	if(FD_ISSET(0, &readfds)){
 		bufp = fgets(buf, sizeof(buf), stdin);
-		if(bufp == NULL)
+		if(bufp == NULL) /* client closed connection */
 			size = 0;
 		else{
 			size = strlen(buf);
@@ -76,5 +76,5 @@ void *chat(int sockfd, struct addrinfo *p)
 		printf("%s\n", buf);
 	}
 
-	return p;
+	return p; /* any non NULL pointer */
  }

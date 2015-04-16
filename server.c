@@ -2,7 +2,7 @@
 
 /* represent each client */
 struct client{
-	char ip[INET6_ADDRSTRLEN];
+	char ip[INET6_ADDRSTRLEN];	/* human readable address */
 	struct sockaddr src_addr;
 	int src_addrlen;
 	struct client *next;
@@ -13,7 +13,7 @@ void sendAll(char *, struct client **, int, struct sockaddr *, int, char *, int)
 
 int main()
 {
-	int closed;
+	int closed;	/* connection closed or not */
 	int sockfd;
 	int numBytes;
 	char msg[MSGLEN];
@@ -75,6 +75,7 @@ int main()
 		}
 		printf("%s\n", msg);
 
+		/* send msg to other clients */
 		sendAll(msg, &clientList, sockfd, &src_addr, src_addrlen, dst_addr, closed);
 
 		src_addrlen = sizeof(struct sockaddr);
